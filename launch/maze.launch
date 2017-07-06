@@ -1,0 +1,34 @@
+<launch>
+
+	<!-- Team Parameters -->
+	<param name= "n" type = "int" value= "3"/>
+	<param name= "robot_prefix" type = "str" value= "odroid"/>
+	<param name= "t_stop_bias" type= "double" value = "0.5"/>
+	<param name= "logger" type= "bool" value = "True"/>
+	<param name= "c_lock" type= "bool" value = "True"/>
+	<param name= "log_path" type = "str" value= "/home/brian/zumy_workspace/bagfiles/maze/t2/"/>
+	<rosparam param="robot_suffix"> ["6","7","1"]</rosparam>
+
+	<!-- IMU Parameters -->
+	<param name= "imu_hz"  type= "double" value= "30.0"/>
+	<param name= "s2_g"  type= "double" value= "1.0"/>
+	<param name= "s2_a"  type= "double" value= "4.0"/>
+	<param name= "s2_wg"  type= "double" value= "0.001"/>
+	<param name= "s2_wa"  type= "double" value= "0.001"/>
+	<rosparam param="gd"> [True,False,True]</rosparam>
+
+	<!-- Camera Transform -->
+
+	<rosparam param="p_C"> [0.0,0.0,0.0]</rosparam>
+	<rosparam param="q_O_C"> [-0.481270536082878,   0.488422948058556,  -0.518750900757403,   0.510606686937191]</rosparam>
+
+	<!-- Team Initilization -->
+	<node name="coop_loc_init" pkg="coop_loc" type="team_init.py" output="screen">
+		<param name= "init_time"  type= "double" value= "15"/>
+	</node>
+
+	<!-- Team Localization -->
+	<node name="coop_loc" pkg="coop_loc" type="team_loc.py" output="screen">
+	</node>
+
+</launch>

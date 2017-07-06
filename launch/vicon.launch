@@ -1,0 +1,7 @@
+<launch>
+
+	<param name= "log_path" type = "str" value= "/home/brian/zumy_workspace/bagfiles/maze/"/>
+	<node name="vicon2csv" pkg="coop_loc" type="vicon.py" output="screen">
+	</node>
+
+</launch>

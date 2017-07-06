@@ -1,0 +1,54 @@
+<launch>
+	
+	<include file="$(find usb_cam)/launch/usb_cam-test.launch"/>
+
+
+	<arg name="picket_1" default="odroid1"/> 
+	<arg name="marker_positions_file_1" default="$(find monocular_pose_estimator)/marker_positions/$(arg picket_1).yaml"/> 
+
+	<group ns="$(arg picket_1)" >
+		<node name="pose_est" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false" output="screen"> 
+			<rosparam command="load" file="$(arg marker_positions_file_1)"/>
+			<param name= "threshold_value" value = "200" />
+			<param name= "gaussian_sigma" value = "0.6" />
+			<param name= "min_blob_area" value = "9" />
+			<param name= "max_blob_area" value = "3000" />
+			<param name= "max_width_height_distortion" value = "0.75" />
+			<param name= "max_circular_distortion" value = "0.75" />
+			<param name= "back_projection_pixel_tolerance" value = "5" />
+			<param name= "nearest_neighbour_pixel_tolerance" value = "7" />
+			<param name= "certainty_threshold" value = "0.50" />
+			<param name= "valid_correspondence_threshold" value = "0.50" />
+      <param name= "roi_border_thickness" value="20" />
+      <remap from="/camera/camera_info" to="/usb_cam/camera_info" />
+      <remap from="/camera/image_raw" to="/usb_cam/image_raw" />
+		</node>
+	
+		<node name="viz_pos" pkg="image_view" type="image_view" args="image:=image_with_detections" />
+	</group>
+
+	<arg name="picket_2" default="odroid7"/> 
+	<arg name="marker_positions_file_2" default="$(find monocular_pose_estimator)/marker_positions/$(arg picket_2).yaml"/> 
+
+	<group ns="$(arg picket_2)" >
+		<node name="pose_est" pkg="monocular_pose_estimator" type="monocular_pose_estimator" respawn="false" output="screen"> 
+			<rosparam command="load" file="$(arg marker_positions_file_2)"/>
+			<param name= "threshold_value" value = "200" />
+			<param name= "gaussian_sigma" value = "0.6" />
+			<param name= "min_blob_area" value = "9" />
+			<param name= "max_blob_area" value = "3000" />
+			<param name= "max_width_height_distortion" value = "0.75" />
+			<param name= "max_circular_distortion" value = "0.75" />
+			<param name= "back_projection_pixel_tolerance" value = "5" />
+			<param name= "nearest_neighbour_pixel_tolerance" value = "7" />
+			<param name= "certainty_threshold" value = "0.50" />
+			<param name= "valid_correspondence_threshold" value = "0.50" />
+      <param name= "roi_border_thickness" value="20" />
+      <remap from="/camera/camera_info" to="/usb_cam/camera_info" />
+      <remap from="/camera/image_raw" to="/usb_cam/image_raw" />
+		</node>
+	
+		<node name="viz_pos" pkg="image_view" type="image_view" args="image:=image_with_detections" />
+	</group>
+
+</launch>
