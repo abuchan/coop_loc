@@ -78,7 +78,7 @@ class team_init():
       rospy.Subscriber(self.robot_prefix+self.robot_suffix[ii]+"/camera_0/estimated_pose",PoseWithCovarianceStamped,camera_anonymous_callback(self,ii))
 
   def imu_callback(self,ii,msg):
-
+#print "Got IMU from robot %d" % ii
     # Process Message
     t = msg.header.stamp.to_sec()
 
@@ -94,7 +94,9 @@ class team_init():
     self.check_time(t-self.t_bias[ii,0])
 
   def camera_callback(self,ii,msg):
-    print 'Got pose estimate %s from camera %d' % (msg.header.frame_id, ii) 
+    #print 'Got pose estimate %s from camera %d' % (msg.header.frame_id, ii) 
+    obs_ii = int(msg.header.frame_id[-1])
+
     # Process Message
     t = msg.header.stamp.to_sec()
     quat = msg.pose.pose.orientation
@@ -109,9 +111,9 @@ class team_init():
     p_O_B   = quat2rot(quat_inv(self.q_O_C))*p_C_B + self.p_C
 
     # Update Pose Estimate
-    self.x[QUAT +ii*SL,0] = q_O_B
-    self.x[POS +ii*SL,0] = p_O_B
-    self.p[PPOSE + ii*PL,PPOSE.T+ii*PL] = cov
+    self.x[QUAT + obs_ii*SL,0] = q_O_B
+    self.x[POS + obs_ii*SL,0] = p_O_B
+    self.p[PPOSE + obs_ii*PL, PPOSE.T+ obs_ii*PL] = cov
 
     self.check_time(t)
 

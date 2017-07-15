@@ -120,8 +120,11 @@ class team_loc():
     self.sensor_manager.add_meas(msg,ii,IMU,self.t_bias[ii,0])
 
   def camera_callback(self,ii,msg):
-    print 'Got pose estimate %s from camera %d' % (msg.header.frame_id, ii) 
-    msg.header.frame_id = str(ii)
+    #print 'Got pose estimate %s from camera %d' % (msg.header.frame_id, ii) 
+    #msg.header.frame_id = str(ii)
+    #TODO: parse from_frame:to_frame in frame_id in case of observations
+    # from other cameras
+    msg.header.frame_id = msg.header.frame_id[-1]
     self.sensor_manager.add_meas(msg,ii,POSE,self.t_bias[0,0])
 
   def publish_state(self,x,c):

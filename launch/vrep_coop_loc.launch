@@ -1,7 +1,7 @@
 <launch>
 
 	<!-- Team Parameters -->
-	<param name= "n" type = "int" value= "2"/>
+	<param name= "n" type = "int" value= "3"/>
 	<param name= "robot_prefix" type = "str" value= "robot_"/>
 	<param name= "log_path" type = "str" value= "/home/abuchan/projects/sim_ws/data/"/>
   <param name= "t_stop_bias" type= "double" value = "0.3"/>
@@ -24,11 +24,10 @@
 
 	<!-- Team Initilization -->
 	<node name="coop_loc_init" pkg="coop_loc" type="team_init.py" output="screen">
-		<param name= "init_time"  type= "double" value= "5"/>
+		<param name= "init_time"  type= "double" value= "1"/>
 	</node>
 
 	<!-- Team Localization -->
-	<node name="coop_loc" pkg="coop_loc" type="team_loc.py" output="screen">
-	</node>
+	<node name="coop_loc" pkg="coop_loc" type="team_loc.py" output="screen" />
 
 </launch>
