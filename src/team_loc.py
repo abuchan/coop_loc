@@ -43,6 +43,10 @@ class team_loc():
     # Camera Transform
     self.p_C = matrix(rospy.get_param("p_C")).T
     self.q_O_C = quat_norm(matrix(rospy.get_param("q_O_C")).T)
+   
+    self.H_c_r = tf.transformations.quaternion_matrix(list(self.q_O_C.flat))
+    self.H_c_r[:3,3] = list(self.p_C.flat)
+    self.H_c_r = np.linalg.inv(self.H_c_r)
 
     # IMU Bias
     s2_g  = rospy.get_param("s2_g")
@@ -115,46 +119,67 @@ class team_loc():
     self.lock = threading.Condition()
 
   def imu_callback(self,ii,msg):
-
+    self.lock.acquire()
     msg.header.frame_id = str(ii)
     self.sensor_manager.add_meas(msg,ii,IMU,self.t_bias[ii,0])
+    self.lock.release()
 
   def camera_callback(self,ii,msg):
-    #print 'Got pose estimate %s from camera %d' % (msg.header.frame_id, ii) 
-    #msg.header.frame_id = str(ii)
-    #TODO: parse from_frame:to_frame in frame_id in case of observations
-    # from other cameras
-    msg.header.frame_id = msg.header.frame_id[-1]
-    self.sensor_manager.add_meas(msg,ii,POSE,self.t_bias[0,0])
+    self.lock.acquire()
 
-  def publish_state(self,x,c):
+    base_idx = ii
+    child_idx = int(msg.header.frame_id[-1])
     
-    for ii in range(0,self.n):
-      if c[ii,0]:
-        if ii == 0:
-          self.tf_pub.sendTransform((x[4+ii*SL,0], x[5+ii*SL,0], x[6+ii*SL,0]),
-                    (x[0+ii*SL,0], x[1+ii*SL,0], x[2+ii*SL,0], x[3+ii*SL,0]),
-                    rospy.Time.now(), "observer", "world")
-        else:
-          self.tf_pub.sendTransform((x[4+ii*SL,0], x[5+ii*SL,0], x[6+ii*SL,0]),
-                    (x[0+ii*SL,0], x[1+ii*SL,0], x[2+ii*SL,0], x[3+ii*SL,0]),
-                    rospy.Time.now(), ("p-"+str(ii)), "world")
-          #print '['+str(x[0+ii*SL,0]) +',' + str(x[1+ii*SL,0])+ ',' + str(x[1+ii*SL,0]) + ',' + str(x[3+ii*SL,0]) + ']'
+    if base_idx == 0:
+      msg.header.frame_id = str(child_idx)
+      self.sensor_manager.add_meas(msg, child_idx, POSE, self.t_bias[0,0])
 
+    # If a picket observes r00, flip the pose
+    elif child_idx == 0:
+      msg.header.frame_id = str(base_idx)
+      pos = msg.pose.pose.position
+      ori = msg.pose.pose.orientation
+      p = numpy.array([pos.x, pos.y, pos.z])
+      o = numpy.array([ori.x, ori.y, ori.z, ori.w])
+      H = tf.transformations.quaternion_matrix(o)
+      H[:3,3] = p
+
+      H_flip = self.H_c_r.dot(np.linalg.inv(H).dot(self.H_c_r))
+      fo = tf.transformations.quaternion_from_matrix(H_flip)
+      fp = H_flip[:3,3]
+      
+      msg.pose.pose.position.x = fp[0]
+      msg.pose.pose.position.y = fp[1]
+      msg.pose.pose.position.z = fp[2]
+      msg.pose.pose.orientation.x = fo[0]
+      msg.pose.pose.orientation.y = fo[1]
+      msg.pose.pose.orientation.z = fo[2]
+      msg.pose.pose.orientation.w = fo[3]
+      self.sensor_manager.add_meas(msg, base_idx, POSE, self.t_bias[0,0])
+
+    self.lock.release()
+
+  # Publish full estimated state of robots relative to world
+  def publish_state(self,x,c):
+    for ii in range(self.n):
+      self.tf_pub.sendTransform((x[4+ii*SL,0], x[5+ii*SL,0], x[6+ii*SL,0]),
+        (x[0+ii*SL,0], x[1+ii*SL,0], x[2+ii*SL,0], x[3+ii*SL,0]),
+        rospy.Time.now(), "robot_%02d_est" % ii, "world")
+
+  # Publish current camera observations relative to robot_00_filt frame
   def publish_relative_pose(self,z,c):
-
-    for ii in range (0,self.n-1):
+    for ii in range(self.n-1):
       if c[ii,0]:
         q_C_B = z[QUAT+(ii)*ZL,0]
         p_C_B = z[POS+(ii)*ZL,0]
 
-          # Convert to Observer Frame
+        # Convert to Observer Frame
         q_O_B = quat_mult(q_C_B,self.q_O_C)
-        p_O_B   = quat2rot(quat_inv(self.q_O_C))*p_C_B + self.p_C
+        p_O_B = quat2rot(quat_inv(self.q_O_C))*p_C_B + self.p_C
 
         self.tf_pub.sendTransform((p_O_B[0,0], p_O_B[1,0], p_O_B[2,0]),
           (q_O_B[0,0], q_O_B[1,0], q_O_B[2,0], q_O_B[3,0]),
-          rospy.Time.now(), ("z-"+str(ii+1)), "observer")
+          rospy.Time.now(), "robot_%02d_obs" % (ii+1), "robot_00_est")
 
   def state_estimation(self):
 
@@ -235,14 +260,14 @@ class team_loc():
         # Form Z, R, v_cam
         z = eye((self.n-1)*ZL)
         z[Z+jj*ZL,0] = vstack((quat.x,quat.y,quat.z,quat.w,pos.x,pos.y,pos.z))
-
-        R = 1e-25*eye((self.n-1)*RL) #1e-25 prevents singularity from floating point arithmetic
+        
+        #1e-25 prevents singularity from floating point arithmetic
+        R = 1e-25*eye((self.n-1)*RL)
 
         # Stopping time and movement restriction lock
         c_imu = np.logical_or(self.c_imu[:,1],self.t-self.c_imu_t < .2)
         if c_imu[0,0] and self.c_lock:
           c_imu[1:self.n,0] = False
-
 
         if c_imu[0,0]:
           R[ZCOV+jj*RL,ZCOV.T +jj*RL] = cov/10
@@ -251,7 +276,6 @@ class team_loc():
 
         v_cam = zeros((self.n-1,1))
         v_cam[jj,0] = True
-
 
         # EKF propagate & update
 
@@ -273,20 +297,20 @@ class team_loc():
           with open(self.log_path + "c.csv",'a') as f_handle:
             np.savetxt(f_handle, np.transpose(np.array(self.c_imu[:,1])), delimiter=",")
 
-        #self.publish_relative_pose(z,v_cam)
+        self.publish_relative_pose(z,v_cam)
         self.publish_state(self.x,vstack((matrix('1'),v_cam)))
 
 def main(args):
-    rospy.init_node('team_loc()', anonymous=True)
-    team = team_loc()
-    rate = rospy.Rate(2) #2 Hz
-    while not rospy.is_shutdown():
-      team.state_estimation()
-      rate.sleep()
-    rospy.spin()
+  rospy.init_node('team_loc()', anonymous=True)
+  team = team_loc()
+  rate = rospy.Rate(2) #2 Hz
+  while not rospy.is_shutdown():
+    team.state_estimation()
+    rate.sleep()
+  rospy.spin()
 
 if __name__ == '__main__':
-    main(sys.argv)
+  main(sys.argv)
 
 
 
