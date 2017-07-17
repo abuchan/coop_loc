@@ -35,6 +35,9 @@ class team_init():
     self.init_time = rospy.get_param("~init_time")
     self.start_time = 0
 
+    # robot_00 initial position
+    self.r0_x0 = matrix(rospy.get_param("r0_x0")).T
+
     # Camera Transform
     self.p_C = matrix(rospy.get_param("p_C")).T
     self.q_O_C = quat_norm(matrix(rospy.get_param("q_O_C")).T)
